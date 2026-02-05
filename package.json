@@ -1,0 +1,30 @@
+{
+  "name": "hp-birth-certificate-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Bot for HP Government Birth Certificate Services",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "birth-certificate",
+    "government",
+    "hp"
+  ],
+  "author": "Webfast IT Solutions",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Birth Certificate Application - HP Government</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .form-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            overflow: hidden;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .form-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .form-header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .form-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #4ade80;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .form-body {
+            padding: 30px 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .required {
+            color: #ef4444;
+            margin-left: 4px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s;
+            background: #f9fafb;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 20px;
+            padding-right: 40px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .radio-option {
+            flex: 1;
+        }
+
+        .radio-option input[type="radio"] {
+            display: none;
+        }
+
+        .radio-option label {
+            display: block;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f9fafb;
+            font-size: 14px;
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: 500;
+        }
+
+        .radio-option input[type="radio"]:checked + label {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .success-message {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #10b981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .success-icon svg {
+            width: 50px;
+            height: 50px;
+            stroke: white;
+            stroke-width: 3;
+        }
+
+        .success-message h2 {
+            color: #10b981;
+            margin-bottom: 12px;
+            font-size: 24px;
+        }
+
+        .success-message p {
+            color: #6b7280;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .application-id {
+            background: #f0fdf4;
+            color: #10b981;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            margin: 20px 0;
+            font-size: 16px;
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 480px) {
+            body {
+                padding: 0;
+            }
+
+            .form-container {
+                border-radius: 0;
+                max-height: 100vh;
+            }
+
+            .form-header {
+                padding: 20px;
+            }
+
+            .form-header h1 {
+                font-size: 20px;
+            }
+
+            .form-body {
+                padding: 20px 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <div class="form-header">
+            <button class="close-btn" onclick="window.close()" title="Close">×</button>
+            <h1>🏛️ Birth Certificate Application</h1>
+            <p>Himachal Pradesh Government e-Services</p>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress"></div>
+        </div>
+
+        <form id="birthCertForm" class="form-body">
+            <div class="error-message" id="errorMessage"></div>
+
+            <!-- Child Details Section -->
+            <h3 style="color: #667eea; margin-bottom: 20px; font-size: 18px;">👶 Child's Details</h3>
+
+            <div class="form-group">
+                <label>Child's Full Name <span class="required">*</span></label>
+                <input type="text" name="childName" id="childName" placeholder="Enter child's full name" required>
+            </div>
+
+            <div class="form-group">
+                <label>Date of Birth <span class="required">*</span></label>
+                <input type="date" name="dob" id="dob" required>
+                <div class="help-text">Select the child's date of birth</div>
+            </div>
+
+            <div class="form-group">
+                <label>Gender <span class="required">*</span></label>
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio" name="gender" value="Male" id="male" required>
+                        <label for="male">👦 Male</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" name="gender" value="Female" id="female">
+                        <label for="female">👧 Female</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" name="gender" value="Other" id="other">
+                        <label for="other">⚧️ Other</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Parents Details -->
+            <h3 style="color: #667eea; margin: 30px 0 20px; font-size: 18px;">👨‍👩‍👦 Parents' Details</h3>
+
+            <div class="form-group">
+                <label>Father's Full Name <span class="required">*</span></label>
+                <input type="text" name="fatherName" id="fatherName" placeholder="Enter father's full name" required>
+            </div>
+
+            <div class="form-group">
+                <label>Mother's Full Name <span class="required">*</span></label>
+                <input type="text" name="motherName" id="motherName" placeholder="Enter mother's full name" required>
+            </div>
+
+            <!-- Birth Place Details -->
+            <h3 style="color: #667eea; margin: 30px 0 20px; font-size: 18px;">🏥 Place of Birth</h3>
+
+            <div class="form-group">
+                <label>Place of Birth <span class="required">*</span></label>
+                <select name="placeOfBirth" id="placeOfBirth" required>
+                    <option value="">Select place of birth</option>
+                    <option value="Hospital">Hospital</option>
+                    <option value="Home">Home</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="hospitalNameGroup" style="display: none;">
+                <label>Hospital Name <span class="required">*</span></label>
+                <input type="text" name="hospitalName" id="hospitalName" placeholder="Enter hospital name">
+            </div>
+
+            <div class="form-group">
+                <label>City/Town <span class="required">*</span></label>
+                <input type="text" name="city" id="city" placeholder="Enter city or town" required>
+            </div>
+
+            <div class="form-group">
+                <label>District <span class="required">*</span></label>
+                <select name="district" id="district" required>
+                    <option value="">Select district</option>
+                    <option value="Shimla">Shimla</option>
+                    <option value="Mandi">Mandi</option>
+                    <option value="Kangra">Kangra</option>
+                    <option value="Kullu">Kullu</option>
+                    <option value="Solan">Solan</option>
+                    <option value="Hamirpur">Hamirpur</option>
+                    <option value="Una">Una</option>
+                    <option value="Bilaspur">Bilaspur</option>
+                    <option value="Chamba">Chamba</option>
+                    <option value="Sirmaur">Sirmaur</option>
+                    <option value="Kinnaur">Kinnaur</option>
+                    <option value="Lahaul and Spiti">Lahaul and Spiti</option>
+                </select>
+            </div>
+
+            <!-- Contact Information -->
+            <h3 style="color: #667eea; margin: 30px 0 20px; font-size: 18px;">📱 Contact Information</h3>
+
+            <div class="form-group">
+                <label>Complete Address <span class="required">*</span></label>
+                <textarea name="address" id="address" placeholder="House No., Street, Area, City, PIN Code" required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Mobile Number <span class="required">*</span></label>
+                <input type="tel" name="mobile" id="mobile" placeholder="10-digit mobile number" pattern="[6-9][0-9]{9}" required>
+                <div class="help-text">Enter a valid 10-digit mobile number</div>
+            </div>
+
+            <div class="form-group">
+                <label>Email Address (Optional)</label>
+                <input type="email" name="email" id="email" placeholder="your.email@example.com">
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">
+                Submit Application
+            </button>
+        </form>
+
+        <div class="success-message" id="successMessage">
+            <div class="success-icon">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <h2>Application Submitted!</h2>
+            <div class="application-id" id="applicationId"></div>
+            <p>Your birth certificate application has been received successfully.</p>
+            <p style="margin-top: 12px;">You will receive updates on WhatsApp.</p>
+            <button class="submit-btn" style="margin-top: 20px;" onclick="window.close()">
+                Close Window
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('birthCertForm');
+        const placeOfBirth = document.getElementById('placeOfBirth');
+        const hospitalNameGroup = document.getElementById('hospitalNameGroup');
+        const hospitalName = document.getElementById('hospitalName');
+        const progress = document.getElementById('progress');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const formBody = document.querySelector('.form-body');
+
+        // Show/hide hospital name based on place of birth
+        placeOfBirth.addEventListener('change', function() {
+            if (this.value === 'Hospital') {
+                hospitalNameGroup.style.display = 'block';
+                hospitalName.required = true;
+            } else {
+                hospitalNameGroup.style.display = 'none';
+                hospitalName.required = false;
+            }
+        });
+
+        // Update progress bar as form is filled
+        const formInputs = form.querySelectorAll('input[required], select[required], textarea[required]');
+        formInputs.forEach(input => {
+            input.addEventListener('input', updateProgress);
+            input.addEventListener('change', updateProgress);
+        });
+
+        function updateProgress() {
+            let filled = 0;
+            formInputs.forEach(input => {
+                if (input.type === 'radio') {
+                    const radioGroup = form.querySelectorAll(`input[name="${input.name}"]`);
+                    if (Array.from(radioGroup).some(radio => radio.checked)) {
+                        filled++;
+                    }
+                } else if (input.value.trim() !== '') {
+                    filled++;
+                }
+            });
+            const percentage = (filled / formInputs.length) * 100;
+            progress.style.width = percentage + '%';
+        }
+
+        // Form submission
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            errorMessage.style.display = 'none';
+
+            // Get form data
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            // Get phone number from URL parameter (sent by WhatsApp bot)
+            const urlParams = new URLSearchParams(window.location.search);
+            const phoneNumber = urlParams.get('phone') || 'unknown';
+            data.phoneNumber = phoneNumber;
+
+            try {
+                // Send data to your server
+                const response = await fetch('/api/submit-application', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Show success message
+                    formBody.style.display = 'none';
+                    successMessage.style.display = 'block';
+                    document.getElementById('applicationId').textContent = 
+                        `Application ID: ${result.applicationId}`;
+
+                    // Notify WhatsApp bot (optional)
+                    if (window.opener) {
+                        window.opener.postMessage({
+                            type: 'applicationSubmitted',
+                            applicationId: result.applicationId
+                        }, '*');
+                    }
+                } else {
+                    throw new Error(result.message || 'Submission failed');
+                }
+            } catch (error) {
+                errorMessage.textContent = '❌ ' + error.message;
+                errorMessage.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Application';
+            }
+        });
+
+        // Initial progress update
+        updateProgress();
+    </script>
+</body>
+</html>

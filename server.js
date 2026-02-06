@@ -1,7 +1,7 @@
 /**
- * WhatsApp Birth Certificate Bot V2 - UPGRADED
- * Professional UI with Interactive Lists & Buttons
+ * WhatsApp Birth Certificate Bot
  * HP Government e-Services
+ * Built with Meta WhatsApp Business API
  */
 
 const express = require('express');
@@ -23,12 +23,12 @@ const CONFIG = {
   META_API_VERSION: 'v18.0'
 };
 
-// In-memory storage
+// In-memory storage (replace with database in production)
 const userSessions = new Map();
 const applications = new Map();
 
 // =============================================================================
-// WHATSAPP API HELPER - UPGRADED
+// WHATSAPP API HELPER
 // =============================================================================
 
 class WhatsAppAPI {
@@ -65,72 +65,42 @@ class WhatsAppAPI {
     });
   }
 
-  static async sendInteractiveButtons(to, bodyText, buttons, headerText = null, footerText = null) {
-    const message = {
+  static async sendButtonMessage(to, text, buttons) {
+    return this.sendMessage(to, {
       type: 'interactive',
       interactive: {
         type: 'button',
-        body: { text: bodyText },
+        body: { text: text },
         action: {
-          buttons: buttons.slice(0, 3).map((btn, idx) => ({
+          buttons: buttons.map((btn, idx) => ({
             type: 'reply',
             reply: {
               id: btn.id || `btn_${idx}`,
-              title: btn.title.substring(0, 20) // Max 20 chars
+              title: btn.title
             }
           }))
         }
       }
-    };
-
-    if (headerText) {
-      message.interactive.header = {
-        type: 'text',
-        text: headerText
-      };
-    }
-
-    if (footerText) {
-      message.interactive.footer = {
-        text: footerText
-      };
-    }
-
-    return this.sendMessage(to, message);
+    });
   }
 
-  static async sendInteractiveList(to, bodyText, buttonText, sections, headerText = null, footerText = null) {
-    const message = {
+  static async sendListMessage(to, text, buttonText, sections) {
+    return this.sendMessage(to, {
       type: 'interactive',
       interactive: {
         type: 'list',
-        body: { text: bodyText },
+        body: { text: text },
         action: {
           button: buttonText,
           sections: sections
         }
       }
-    };
-
-    if (headerText) {
-      message.interactive.header = {
-        type: 'text',
-        text: headerText
-      };
-    }
-
-    if (footerText) {
-      message.interactive.footer = {
-        text: footerText
-      };
-    }
-
-    return this.sendMessage(to, message);
+    });
   }
 }
 
 // =============================================================================
-// SESSION MANAGEMENT
+// USER SESSION MANAGEMENT
 // =============================================================================
 
 class SessionManager {
@@ -140,7 +110,6 @@ class SessionManager {
         state: 'INITIAL',
         language: 'en',
         data: {},
-        consentGiven: false,
         createdAt: Date.now()
       });
     }
@@ -161,7 +130,7 @@ class SessionManager {
 }
 
 // =============================================================================
-// MESSAGE TEMPLATES - UPGRADED
+// MESSAGE TEMPLATES
 // =============================================================================
 
 const MESSAGES = {
@@ -170,224 +139,108 @@ const MESSAGES = {
 
 👋 Namaste! I'm your digital assistant for birth certificate applications.
 
-*Powered by InstaGov - HP Government e-Services*
-
-Please select your preferred language:`,
-
-    data_consent: `📋 *DATA CONSENT REQUIRED*
-
-To process your birth certificate application, we need to collect and process your personal information.
-
-*We will collect:*
-• Child's personal details
-• Parents' information
-• Contact details
-• Address information
-
-*Your data will be:*
-✅ Kept confidential
-✅ Used only for birth certificate processing
-✅ Protected as per data protection laws
-
-Do you consent to data collection?`,
-
-    documents_required: `📄 *Documents Required*
-
-To complete your birth certificate application, please keep these documents ready in digital format (image/PDF/DigiLocker):
-
-📸 *Required Documents:*
-• Hospital discharge certificate / Birth proof
-• Parents' ID proof (Aadhaar/Voter ID/Driving License)
-• Address proof (Aadhaar/Utility bill)
-• Parents' marriage certificate (if applicable)
-
-📝 *Optional Documents:*
-• Medical records from hospital
-• Declaration affidavit (if home birth)
-
-Click below when ready:`,
-
+Please select your preferred language to continue:`,
+    
     main_menu: `📋 *Main Menu*
 
 What would you like to do?
 
-*Available Services:*
 1️⃣ Apply for New Birth Certificate
 2️⃣ Check Application Status
 3️⃣ Download Certificate
 4️⃣ Help & Support
 
-Please select from the menu below:`,
+Reply with the number of your choice.`,
 
     start_application: `📝 *New Birth Certificate Application*
 
-*Application Process:*
-Step 1️⃣ Personal Details
-Step 2️⃣ Parents Information
-Step 3️⃣ Birth Details
-Step 4️⃣ Verification & Submit
+I'll help you apply for a birth certificate. Please have the following information ready:
 
-⏱️ Estimated time: 5 minutes
-📋 Processing time: 7-10 working days
+✅ Child's details (Name, DOB, Gender)
+✅ Parents' details
+✅ Place of birth
+✅ Contact information
 
-Let's begin!
+Let's begin! 
 
-*Please enter the FULL NAME of the child:*
+What is the *full name of the child*?`,
 
-(Example: Rahul Kumar Sharma)`,
+    ask_dob: `📅 What is the *date of birth* of the child?
 
-    ask_dob: `📅 *Date of Birth*
+Please enter in format: DD/MM/YYYY
+Example: 15/01/2024`,
 
-Please enter the child's date of birth:
+    ask_gender: `👶 What is the *gender* of the child?
 
-*Format:* DD/MM/YYYY
-*Example:* 15/01/2024
+Reply with:
+1️⃣ Male
+2️⃣ Female
+3️⃣ Other`,
 
-⚠️ Make sure the date is correct as per hospital records.`,
+    ask_father_name: `👨 What is the *father's full name*?`,
 
-    ask_gender: `👶 *Gender Selection*
+    ask_mother_name: `👩 What is the *mother's full name*?`,
 
-Please select the gender of the child from the list below:`,
+    ask_place_of_birth: `🏥 Where was the child born?
 
-    ask_father_name: `👨 *Father's Information*
+Reply with:
+1️⃣ Hospital
+2️⃣ Home
+3️⃣ Other`,
 
-Please enter the *father's full name*:
+    ask_hospital_name: `🏥 What is the *name of the hospital*?`,
 
-(Example: Rajesh Kumar Sharma)`,
+    ask_address: `🏠 What is your *complete address*?
 
-    ask_mother_name: `👩 *Mother's Information*
+Include: House/Flat No., Street, Area, City, PIN Code`,
 
-Please enter the *mother's full name*:
+    ask_mobile: `📱 What is your *mobile number*?
 
-(Example: Priya Sharma)`,
+This will be used for updates and OTP verification.`,
 
-    ask_place_of_birth: `🏥 *Place of Birth*
+    confirm_details: `✅ *Please confirm your details:*
 
-Where was the child born?
+👶 Child Name: {childName}
+📅 Date of Birth: {dob}
+👤 Gender: {gender}
+👨 Father's Name: {fatherName}
+👩 Mother's Name: {motherName}
+🏥 Place of Birth: {placeOfBirth}
+🏠 Address: {address}
+📱 Mobile: {mobile}
 
-Please select from the options below:`,
+Is this information correct?
 
-    ask_hospital_name: `🏥 *Hospital Details*
+1️⃣ Yes, Submit Application
+2️⃣ No, Start Over`,
 
-Please enter the *complete name of the hospital*:
+    application_submitted: `🎉 *Application Submitted Successfully!*
 
-(Example: IGMC Hospital, Shimla)`,
+Your application ID: *{applicationId}*
 
-    ask_address: `🏠 *Residential Address*
+✅ Your birth certificate application has been received
+📧 Confirmation sent to your mobile
+⏱️ Processing time: 7-10 working days
 
-Please enter your *complete residential address*:
-
-*Include:*
-• House/Flat Number
-• Street/Area Name
-• Locality
-• City/Town
-• District
-• PIN Code
-
-*Example:*
-House No. 123, Green Park Colony
-Near City Mall, Shimla
-District: Shimla, HP - 171001`,
-
-    ask_mobile: `📱 *Mobile Number*
-
-Please enter your *10-digit mobile number*:
-
-This number will be used for:
-✅ Application updates
-✅ OTP verification
-✅ Certificate delivery notification
-
-*Example:* 9876543210
-
-⚠️ Make sure the number is active.`,
-
-    confirm_details: `✅ *VERIFY YOUR DETAILS*
-
-Please review the information carefully:
-
-┌─────────────────────────────
-│ 👶 *CHILD DETAILS*
-├─────────────────────────────
-│ Name: {childName}
-│ DOB: {dob}
-│ Gender: {gender}
-├─────────────────────────────
-│ 👨👩 *PARENTS DETAILS*
-├─────────────────────────────
-│ Father: {fatherName}
-│ Mother: {motherName}
-├─────────────────────────────
-│ 🏥 *BIRTH DETAILS*
-├─────────────────────────────
-│ Place: {placeOfBirth}
-├─────────────────────────────
-│ 🏠 *CONTACT DETAILS*
-├─────────────────────────────
-│ Address: {address}
-│ Mobile: {mobile}
-└─────────────────────────────
-
-⚠️ *Important:* Details cannot be changed after submission.
-
-Is all information correct?`,
-
-    application_submitted: `🎉 *APPLICATION SUBMITTED SUCCESSFULLY!*
-
-┌─────────────────────────────
-│ 📋 *APPLICATION DETAILS*
-├─────────────────────────────
-│ Application ID: *{applicationId}*
-│ Date: {date}
-│ Status: ✅ Submitted
-├─────────────────────────────
-│ 📧 *CONFIRMATION*
-├─────────────────────────────
-│ SMS sent to: {mobile}
-│ Confirmation email sent
-└─────────────────────────────
-
-⏱️ *Processing Time:* 7-10 working days
-
-📱 *Track Status:*
-You can check application status anytime by selecting "Check Status" from main menu.
-
-📄 *Next Steps:*
-• Verification by department
-• Document verification
-• Certificate generation
-• SMS notification on completion
-
-💡 *Note:* Save your Application ID: *{applicationId}*
+You can check your application status anytime by selecting "Check Status" from the main menu.
 
 Type *MENU* to return to main menu.`,
 
-    invalid_input: `❌ *Invalid Input*
-
-Please enter the information in the correct format.
-
-Need help? Type *HELP* for assistance.`,
+    invalid_input: `❌ Invalid input. Please try again.`,
 
     help: `ℹ️ *Help & Support*
 
-*📝 How to Apply:*
-1. Select language preference
-2. Give data consent
-3. Choose "Apply for Certificate"
-4. Fill all required details
-5. Review and submit
+*How to apply:*
+1. Select language
+2. Choose "Apply for New Certificate"
+3. Fill in all required details
+4. Submit application
 
-*⏱️ Processing Time:*
-7-10 working days from submission
+*Processing time:* 7-10 working days
 
-*📞 Customer Support:*
-🕐 Mon-Fri: 9:00 AM - 5:00 PM
-📞 Helpline: 1800-XXX-XXXX
+*For technical support:*
+📞 Call: 1800-XXX-XXXX
 📧 Email: support@hpgov.in
-
-*🌐 Portal:*
-Visit: https://eseva.hp.gov.in
 
 Type *MENU* to return to main menu.`
   },
@@ -397,210 +250,107 @@ Type *MENU* to return to main menu.`
 
 👋 नमस्ते! मैं जन्म प्रमाण पत्र आवेदन के लिए आपका डिजिटल सहायक हूं।
 
-*InstaGov द्वारा संचालित - HP सरकार ई-सेवाएं*
-
-कृपया अपनी पसंदीदा भाषा चुनें:`,
-
-    data_consent: `📋 *डेटा सहमति आवश्यक*
-
-आपके जन्म प्रमाण पत्र आवेदन को संसाधित करने के लिए, हमें आपकी व्यक्तिगत जानकारी एकत्र करनी होगी।
-
-*हम एकत्र करेंगे:*
-• बच्चे का व्यक्तिगत विवरण
-• माता-पिता की जानकारी
-• संपर्क विवरण
-• पता जानकारी
-
-*आपका डेटा होगा:*
-✅ गोपनीय रखा जाएगा
-✅ केवल जन्म प्रमाण पत्र के लिए उपयोग किया जाएगा
-✅ डेटा सुरक्षा कानूनों के अनुसार सुरक्षित
-
-क्या आप डेटा संग्रह के लिए सहमत हैं?`,
-
-    documents_required: `📄 *आवश्यक दस्तावेज*
-
-अपना जन्म प्रमाण पत्र आवेदन पूरा करने के लिए, कृपया ये दस्तावेज डिजिटल प्रारूप में तैयार रखें:
-
-📸 *आवश्यक दस्तावेज:*
-• अस्पताल डिस्चार्ज प्रमाण पत्र / जन्म प्रमाण
-• माता-पिता का ID प्रमाण (आधार/वोटर ID)
-• पता प्रमाण (आधार/उपयोगिता बिल)
-• माता-पिता का विवाह प्रमाण पत्र (यदि लागू हो)
-
-तैयार होने पर नीचे क्लिक करें:`,
+कृपया जारी रखने के लिए अपनी पसंदीदा भाषा चुनें:`,
 
     main_menu: `📋 *मुख्य मेनू*
 
 आप क्या करना चाहेंगे?
 
-*उपलब्ध सेवाएं:*
 1️⃣ नया जन्म प्रमाण पत्र के लिए आवेदन करें
 2️⃣ आवेदन की स्थिति जांचें
 3️⃣ प्रमाण पत्र डाउनलोड करें
 4️⃣ सहायता और समर्थन
 
-कृपया नीचे दिए गए मेनू से चुनें:`,
+अपनी पसंद का नंबर भेजें।`,
 
     start_application: `📝 *नया जन्म प्रमाण पत्र आवेदन*
 
-*आवेदन प्रक्रिया:*
-चरण 1️⃣ व्यक्तिगत विवरण
-चरण 2️⃣ माता-पिता की जानकारी
-चरण 3️⃣ जन्म विवरण
-चरण 4️⃣ सत्यापन और सबमिट
+मैं आपको जन्म प्रमाण पत्र के लिए आवेदन करने में मदद करूंगा। कृपया निम्नलिखित जानकारी तैयार रखें:
 
-⏱️ अनुमानित समय: 5 मिनट
-📋 प्रसंस्करण समय: 7-10 कार्य दिवस
+✅ बच्चे का विवरण (नाम, जन्मतिथि, लिंग)
+✅ माता-पिता का विवरण
+✅ जन्म स्थान
+✅ संपर्क जानकारी
 
 आइए शुरू करें!
 
-*कृपया बच्चे का पूरा नाम दर्ज करें:*
+बच्चे का *पूरा नाम* क्या है?`,
 
-(उदाहरण: राहुल कुमार शर्मा)`,
+    ask_dob: `📅 बच्चे की *जन्म तिथि* क्या है?
 
-    ask_dob: `📅 *जन्म तिथि*
+कृपया इस प्रारूप में दर्ज करें: DD/MM/YYYY
+उदाहरण: 15/01/2024`,
 
-कृपया बच्चे की जन्म तिथि दर्ज करें:
+    ask_gender: `👶 बच्चे का *लिंग* क्या है?
 
-*प्रारूप:* DD/MM/YYYY
-*उदाहरण:* 15/01/2024
+जवाब दें:
+1️⃣ पुरुष
+2️⃣ महिला
+3️⃣ अन्य`,
 
-⚠️ सुनिश्चित करें कि तिथि अस्पताल रिकॉर्ड के अनुसार सही है।`,
+    ask_father_name: `👨 पिता का *पूरा नाम* क्या है?`,
 
-    ask_gender: `👶 *लिंग चयन*
+    ask_mother_name: `👩 माता का *पूरा नाम* क्या है?`,
 
-कृपया नीचे दी गई सूची से बच्चे का लिंग चुनें:`,
+    ask_place_of_birth: `🏥 बच्चे का जन्म कहाँ हुआ था?
 
-    ask_father_name: `👨 *पिता की जानकारी*
+जवाब दें:
+1️⃣ अस्पताल
+2️⃣ घर
+3️⃣ अन्य`,
 
-कृपया *पिता का पूरा नाम* दर्ज करें:
+    ask_hospital_name: `🏥 *अस्पताल का नाम* क्या है?`,
 
-(उदाहरण: राजेश कुमार शर्मा)`,
+    ask_address: `🏠 आपका *पूरा पता* क्या है?
 
-    ask_mother_name: `👩 *माता की जानकारी*
+शामिल करें: मकान/फ्लैट नंबर, गली, क्षेत्र, शहर, पिन कोड`,
 
-कृपया *माता का पूरा नाम* दर्ज करें:
+    ask_mobile: `📱 आपका *मोबाइल नंबर* क्या है?
 
-(उदाहरण: प्रिया शर्मा)`,
+इसका उपयोग अपडेट और OTP सत्यापन के लिए किया जाएगा।`,
 
-    ask_place_of_birth: `🏥 *जन्म स्थान*
+    confirm_details: `✅ *कृपया अपने विवरण की पुष्टि करें:*
 
-बच्चे का जन्म कहाँ हुआ था?
+👶 बच्चे का नाम: {childName}
+📅 जन्म तिथि: {dob}
+👤 लिंग: {gender}
+👨 पिता का नाम: {fatherName}
+👩 माता का नाम: {motherName}
+🏥 जन्म स्थान: {placeOfBirth}
+🏠 पता: {address}
+📱 मोबाइल: {mobile}
 
-कृपया नीचे दिए गए विकल्पों में से चुनें:`,
+क्या यह जानकारी सही है?
 
-    ask_hospital_name: `🏥 *अस्पताल विवरण*
-
-कृपया *अस्पताल का पूरा नाम* दर्ज करें:
-
-(उदाहरण: IGMC अस्पताल, शिमला)`,
-
-    ask_address: `🏠 *आवासीय पता*
-
-कृपया अपना *पूरा आवासीय पता* दर्ज करें:
-
-*शामिल करें:*
-• मकान/फ्लैट नंबर
-• गली/क्षेत्र का नाम
-• इलाका
-• शहर
-• जिला
-• पिन कोड
-
-*उदाहरण:*
-मकान नंबर 123, ग्रीन पार्क कॉलोनी
-सिटी मॉल के पास, शिमला
-जिला: शिमला, HP - 171001`,
-
-    ask_mobile: `📱 *मोबाइल नंबर*
-
-कृपया अपना *10 अंकों का मोबाइल नंबर* दर्ज करें:
-
-इस नंबर का उपयोग किया जाएगा:
-✅ आवेदन अपडेट के लिए
-✅ OTP सत्यापन के लिए
-✅ प्रमाण पत्र वितरण सूचना
-
-*उदाहरण:* 9876543210
-
-⚠️ सुनिश्चित करें कि नंबर सक्रिय है।`,
-
-    confirm_details: `✅ *अपने विवरण सत्यापित करें*
-
-कृपया जानकारी की ध्यानपूर्वक समीक्षा करें:
-
-┌─────────────────────────────
-│ 👶 *बच्चे का विवरण*
-├─────────────────────────────
-│ नाम: {childName}
-│ जन्मतिथि: {dob}
-│ लिंग: {gender}
-├─────────────────────────────
-│ 👨👩 *माता-पिता का विवरण*
-├─────────────────────────────
-│ पिता: {fatherName}
-│ माता: {motherName}
-├─────────────────────────────
-│ 🏥 *जन्म विवरण*
-├─────────────────────────────
-│ स्थान: {placeOfBirth}
-├─────────────────────────────
-│ 🏠 *संपर्क विवरण*
-├─────────────────────────────
-│ पता: {address}
-│ मोबाइल: {mobile}
-└─────────────────────────────
-
-⚠️ *महत्वपूर्ण:* सबमिशन के बाद विवरण नहीं बदला जा सकता।
-
-क्या सभी जानकारी सही है?`,
+1️⃣ हां, आवेदन जमा करें
+2️⃣ नहीं, फिर से शुरू करें`,
 
     application_submitted: `🎉 *आवेदन सफलतापूर्वक जमा किया गया!*
 
-┌─────────────────────────────
-│ 📋 *आवेदन विवरण*
-├─────────────────────────────
-│ आवेदन ID: *{applicationId}*
-│ तिथि: {date}
-│ स्थिति: ✅ जमा किया गया
-├─────────────────────────────
-│ 📧 *पुष्टि*
-├─────────────────────────────
-│ SMS भेजा गया: {mobile}
-│ पुष्टि ईमेल भेजा गया
-└─────────────────────────────
+आपका आवेदन ID: *{applicationId}*
 
-⏱️ *प्रसंस्करण समय:* 7-10 कार्य दिवस
+✅ आपका जन्म प्रमाण पत्र आवेदन प्राप्त हो गया है
+📧 आपके मोबाइल पर पुष्टि भेजी गई
+⏱️ प्रक्रिया समय: 7-10 कार्य दिवस
 
-📱 *स्थिति ट्रैक करें:*
-आप मुख्य मेनू से "स्थिति जांचें" चुनकर किसी भी समय आवेदन स्थिति जांच सकते हैं।
-
-💡 *नोट:* अपना आवेदन ID सहेजें: *{applicationId}*
+आप मुख्य मेनू से "स्थिति जांचें" चुनकर किसी भी समय अपने आवेदन की स्थिति जांच सकते हैं।
 
 मुख्य मेनू पर वापस जाने के लिए *MENU* टाइप करें।`,
 
-    invalid_input: `❌ *अमान्य इनपुट*
-
-कृपया सही प्रारूप में जानकारी दर्ज करें।
-
-सहायता चाहिए? सहायता के लिए *HELP* टाइप करें।`,
+    invalid_input: `❌ अमान्य इनपुट। कृपया पुनः प्रयास करें।`,
 
     help: `ℹ️ *सहायता और समर्थन*
 
-*📝 आवेदन कैसे करें:*
-1. भाषा प्राथमिकता चुनें
-2. डेटा सहमति दें
-3. "प्रमाण पत्र के लिए आवेदन करें" चुनें
-4. सभी आवश्यक विवरण भरें
-5. समीक्षा करें और जमा करें
+*आवेदन कैसे करें:*
+1. भाषा चुनें
+2. "नया प्रमाण पत्र के लिए आवेदन करें" चुनें
+3. सभी आवश्यक विवरण भरें
+4. आवेदन जमा करें
 
-*⏱️ प्रसंस्करण समय:*
-जमा करने से 7-10 कार्य दिवस
+*प्रक्रिया समय:* 7-10 कार्य दिवस
 
-*📞 ग्राहक सहायता:*
-🕐 सोम-शुक्र: 9:00 AM - 5:00 PM
-📞 हेल्पलाइन: 1800-XXX-XXXX
+*तकनीकी सहायता के लिए:*
+📞 कॉल करें: 1800-XXX-XXXX
 📧 ईमेल: support@hpgov.in
 
 मुख्य मेनू पर वापस जाने के लिए *MENU* टाइप करें।`
@@ -608,32 +358,27 @@ Type *MENU* to return to main menu.`
 };
 
 // =============================================================================
-// MESSAGE HANDLER - UPGRADED
+// MESSAGE HANDLER
 // =============================================================================
 
 class MessageHandler {
-  static async handle(from, message, messageType = 'text') {
+  static async handle(from, messageText, messageType = 'text') {
     const session = SessionManager.getSession(from);
     const lang = session.language;
     const messages = MESSAGES[lang];
 
-    console.log(`Processing from ${from}, State: ${session.state}, Type: ${messageType}`);
+    console.log(`Processing message from ${from}, State: ${session.state}, Message: ${messageText}`);
 
     try {
-      // Handle button/list responses
-      if (messageType === 'interactive') {
-        return await this.handleInteractive(from, message, session);
+      // Check for menu command
+      if (messageText.toUpperCase() === 'MENU') {
+        SessionManager.updateSession(from, { state: 'MAIN_MENU' });
+        await WhatsAppAPI.sendTextMessage(from, messages.main_menu);
+        return;
       }
 
-      // Handle text messages
-      const messageText = message.toLowerCase().trim();
-
-      // Global commands
-      if (messageText === 'menu') {
-        return await this.showMainMenu(from, session);
-      }
-
-      if (messageText === 'help') {
+      // Check for help command
+      if (messageText.toUpperCase() === 'HELP') {
         await WhatsAppAPI.sendTextMessage(from, messages.help);
         return;
       }
@@ -645,59 +390,51 @@ class MessageHandler {
           break;
 
         case 'LANGUAGE_SELECTION':
-          await this.handleLanguageSelection(from, message, session);
-          break;
-
-        case 'DATA_CONSENT':
-          await this.handleDataConsent(from, message, session);
-          break;
-
-        case 'DOCUMENTS_INFO':
-          await this.handleDocumentsInfo(from, message, session);
+          await this.handleLanguageSelection(from, messageText, session);
           break;
 
         case 'MAIN_MENU':
-          await this.handleMainMenuSelection(from, message, session);
+          await this.handleMainMenu(from, messageText, session);
           break;
 
         case 'COLLECT_CHILD_NAME':
-          await this.handleChildName(from, message, session);
+          await this.handleChildName(from, messageText, session);
           break;
 
         case 'COLLECT_DOB':
-          await this.handleDOB(from, message, session);
+          await this.handleDOB(from, messageText, session);
           break;
 
         case 'COLLECT_GENDER':
-          await this.handleGenderSelection(from, message, session);
+          await this.handleGender(from, messageText, session);
           break;
 
         case 'COLLECT_FATHER_NAME':
-          await this.handleFatherName(from, message, session);
+          await this.handleFatherName(from, messageText, session);
           break;
 
         case 'COLLECT_MOTHER_NAME':
-          await this.handleMotherName(from, message, session);
+          await this.handleMotherName(from, messageText, session);
           break;
 
         case 'COLLECT_PLACE_OF_BIRTH':
-          await this.handlePlaceSelection(from, message, session);
+          await this.handlePlaceOfBirth(from, messageText, session);
           break;
 
         case 'COLLECT_HOSPITAL_NAME':
-          await this.handleHospitalName(from, message, session);
+          await this.handleHospitalName(from, messageText, session);
           break;
 
         case 'COLLECT_ADDRESS':
-          await this.handleAddress(from, message, session);
+          await this.handleAddress(from, messageText, session);
           break;
 
         case 'COLLECT_MOBILE':
-          await this.handleMobile(from, message, session);
+          await this.handleMobile(from, messageText, session);
           break;
 
         case 'CONFIRM_DETAILS':
-          await this.handleConfirmation(from, message, session);
+          await this.handleConfirmation(from, messageText, session);
           break;
 
         default:
@@ -707,176 +444,116 @@ class MessageHandler {
       console.error('Error handling message:', error);
       await WhatsAppAPI.sendTextMessage(
         from,
-        lang === 'hi'
-          ? '❌ कुछ गलत हो गया। कृपया पुनः प्रयास करें या HELP टाइप करें।'
-          : '❌ Something went wrong. Please try again or type HELP.'
+        lang === 'hi' 
+          ? '❌ कुछ गलत हो गया। कृपया पुनः प्रयास करें।'
+          : '❌ Something went wrong. Please try again.'
       );
     }
   }
 
-  static async handleInteractive(from, interactiveData, session) {
-    const buttonId = interactiveData.button_reply?.id || interactiveData.list_reply?.id;
-    
-    console.log(`Interactive response: ${buttonId}`);
-
-    // Map button/list IDs to actions
-    if (buttonId === 'lang_en' || buttonId === 'lang_english') {
-      await this.setLanguage(from, 'en', session);
-    } else if (buttonId === 'lang_hi' || buttonId === 'lang_hindi') {
-      await this.setLanguage(from, 'hi', session);
-    } else if (buttonId === 'consent_yes') {
-      await this.giveConsent(from, session);
-    } else if (buttonId === 'consent_no') {
-      await this.declineConsent(from, session);
-    } else if (buttonId === 'docs_ready') {
-      await this.showMainMenu(from, session);
-    } else if (buttonId === 'menu_apply') {
-      await this.startApplication(from, session);
-    } else if (buttonId === 'menu_status') {
-      await this.checkStatus(from, session);
-    } else if (buttonId === 'menu_help') {
-      await WhatsAppAPI.sendTextMessage(from, MESSAGES[session.language].help);
-    } else if (buttonId === 'gender_male' || buttonId === 'gender_female' || buttonId === 'gender_other') {
-      await this.handleGenderSelection(from, buttonId, session);
-    } else if (buttonId === 'place_hospital' || buttonId === 'place_home' || buttonId === 'place_other') {
-      await this.handlePlaceSelection(from, buttonId, session);
-    } else if (buttonId === 'confirm_yes') {
-      await this.submitApplication(from, session);
-    } else if (buttonId === 'confirm_no') {
-      await this.cancelApplication(from, session);
-    }
-  }
-
   static async handleInitial(from, session) {
-    await WhatsAppAPI.sendInteractiveButtons(
+    await WhatsAppAPI.sendButtonMessage(
       from,
       MESSAGES.en.welcome,
       [
-        { id: 'lang_english', title: '🇬🇧 English' },
-        { id: 'lang_hindi', title: '🇮🇳 हिंदी' }
-      ],
-      '🏛️ HP Government',
-      'Select language to continue'
+        { id: 'lang_en', title: '🇬🇧 English' },
+        { id: 'lang_hi', title: '🇮🇳 हिंदी' }
+      ]
     );
     SessionManager.updateSession(from, { state: 'LANGUAGE_SELECTION' });
   }
 
-  static async setLanguage(from, language, session) {
+  static async handleLanguageSelection(from, message, session) {
+    let language = 'en';
+    
+    if (message.toLowerCase().includes('hindi') || message.toLowerCase().includes('हिंदी') || message === '2') {
+      language = 'hi';
+    }
+
     SessionManager.updateSession(from, { 
       language: language,
-      state: 'DATA_CONSENT'
+      state: 'MAIN_MENU'
     });
 
-    const messages = MESSAGES[language];
-
-    await WhatsAppAPI.sendInteractiveButtons(
-      from,
-      messages.data_consent,
-      [
-        { id: 'consent_yes', title: language === 'hi' ? '✅ हां, सहमत हूं' : '✅ Yes, I Consent' },
-        { id: 'consent_no', title: language === 'hi' ? '❌ नहीं, जारी न रखें' : '❌ No, Don\'t Continue' }
-      ],
-      '📋 Data Consent',
-      'Your privacy is protected'
-    );
+    await WhatsAppAPI.sendTextMessage(from, MESSAGES[language].main_menu);
   }
 
-  static async giveConsent(from, session) {
-    SessionManager.updateSession(from, { 
-      consentGiven: true,
-      state: 'DOCUMENTS_INFO'
-    });
-
-    const messages = MESSAGES[session.language];
-
-    await WhatsAppAPI.sendInteractiveButtons(
-      from,
-      messages.documents_required,
-      [
-        { id: 'docs_ready', title: session.language === 'hi' ? '✅ तैयार हूं' : '✅ I\'m Ready' }
-      ],
-      '📄 Documents',
-      'Keep documents ready before proceeding'
-    );
-  }
-
-  static async declineConsent(from, session) {
+  static async handleMainMenu(from, message, session) {
     const lang = session.language;
-    await WhatsAppAPI.sendTextMessage(
-      from,
-      lang === 'hi'
-        ? '❌ आवेदन रद्द कर दिया गया। डेटा सहमति के बिना हम आगे नहीं बढ़ सकते। यदि आप बदलते हैं तो कभी भी वापस आएं।'
-        : '❌ Application cancelled. We cannot proceed without data consent. Feel free to return anytime if you change your mind.'
-    );
-    SessionManager.resetSession(from);
-  }
+    const messages = MESSAGES[lang];
 
-  static async showMainMenu(from, session) {
-    SessionManager.updateSession(from, { state: 'MAIN_MENU' });
-    const messages = MESSAGES[session.language];
+    if (message === '1' || message.toLowerCase().includes('apply')) {
+      // Send web form link instead of text-based form
+      const formUrl = `https://birth-certificate-bot.onrender.com/form/birth-certificate?phone=${from}`;
+      
+      const formMessage = lang === 'hi'
+        ? `📝 *जन्म प्रमाण पत्र आवेदन*
 
-    await WhatsAppAPI.sendInteractiveList(
-      from,
-      messages.main_menu,
-      session.language === 'hi' ? 'सेवा चुनें' : 'Select Service',
-      [
-        {
-          title: session.language === 'hi' ? '📋 सेवाएं' : '📋 Services',
-          rows: [
-            {
-              id: 'menu_apply',
-              title: session.language === 'hi' ? '📝 नया आवेदन' : '📝 New Application',
-              description: session.language === 'hi' ? 'जन्म प्रमाण पत्र के लिए आवेदन करें' : 'Apply for birth certificate'
-            },
-            {
-              id: 'menu_status',
-              title: session.language === 'hi' ? '🔍 स्थिति जांचें' : '🔍 Check Status',
-              description: session.language === 'hi' ? 'आवेदन की स्थिति देखें' : 'View application status'
-            },
-            {
-              id: 'menu_help',
-              title: session.language === 'hi' ? 'ℹ️ सहायता' : 'ℹ️ Help',
-              description: session.language === 'hi' ? 'सहायता और समर्थन प्राप्त करें' : 'Get help and support'
-            }
-          ]
-        }
-      ],
-      '🏛️ HP e-Services',
-      'Powered by InstaGov'
-    );
-  }
+कृपया नीचे दिए गए लिंक पर क्लिक करें और फॉर्म भरें:
 
-  static async startApplication(from, session) {
-    SessionManager.updateSession(from, { 
-      state: 'COLLECT_CHILD_NAME',
-      data: {}
-    });
-    await WhatsAppAPI.sendTextMessage(from, MESSAGES[session.language].start_application);
-  }
+${formUrl}
 
-  static async checkStatus(from, session) {
-    await WhatsAppAPI.sendTextMessage(
-      from,
-      session.language === 'hi'
-        ? '🔍 स्थिति जांच सुविधा जल्द आ रही है!\n\nकृपया अपना आवेदन ID भेजें।'
-        : '🔍 Status check feature coming soon!\n\nPlease send your Application ID.'
-    );
+📱 फॉर्म आपके ब्राउज़र में खुलेगा
+✅ सभी आवश्यक जानकारी भरें
+🔒 आपका डेटा सुरक्षित है
+
+फॉर्म जमा करने के बाद आपको WhatsApp पर पुष्टि मिलेगी।`
+        : `📝 *Birth Certificate Application*
+
+Please click the link below to fill the application form:
+
+${formUrl}
+
+📱 Form will open in your browser
+✅ Fill all required information
+🔒 Your data is secure
+
+You'll receive confirmation on WhatsApp after submitting.`;
+
+      await WhatsAppAPI.sendTextMessage(from, formMessage);
+      
+      SessionManager.updateSession(from, { state: 'WAITING_FOR_FORM' });
+    } else if (message === '2' || message.toLowerCase().includes('status')) {
+      await WhatsAppAPI.sendTextMessage(
+        from,
+        lang === 'hi'
+          ? '🔍 स्थिति जांच सुविधा जल्द आ रही है!'
+          : '🔍 Status check feature coming soon!'
+      );
+    } else if (message === '3' || message.toLowerCase().includes('download')) {
+      await WhatsAppAPI.sendTextMessage(
+        from,
+        lang === 'hi'
+          ? '📥 डाउनलोड सुविधा जल्द आ रही है!'
+          : '📥 Download feature coming soon!'
+      );
+    } else if (message === '4' || message.toLowerCase().includes('help')) {
+      await WhatsAppAPI.sendTextMessage(from, messages.help);
+    } else {
+      await WhatsAppAPI.sendTextMessage(from, messages.invalid_input);
+      await WhatsAppAPI.sendTextMessage(from, messages.main_menu);
+    }
   }
 
   static async handleChildName(from, message, session) {
+    const lang = session.language;
     session.data.childName = message;
     SessionManager.updateSession(from, { 
       state: 'COLLECT_DOB',
       data: session.data
     });
-    await WhatsAppAPI.sendTextMessage(from, MESSAGES[session.language].ask_dob);
+    await WhatsAppAPI.sendTextMessage(from, MESSAGES[lang].ask_dob);
   }
 
   static async handleDOB(from, message, session) {
+    const lang = session.language;
+    const messages = MESSAGES[lang];
+
+    // Basic date validation
     const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
     if (!dateRegex.test(message)) {
-      await WhatsAppAPI.sendTextMessage(from, MESSAGES[session.language].invalid_input);
-      await WhatsAppAPI.sendTextMessage(from, MESSAGES[session.language].ask_dob);
+      await WhatsAppAPI.sendTextMessage(from, messages.invalid_input);
+      await WhatsAppAPI.sendTextMessage(from, messages.ask_dob);
       return;
     }
 
@@ -885,48 +562,24 @@ class MessageHandler {
       state: 'COLLECT_GENDER',
       data: session.data
     });
-
-    const lang = session.language;
-    await WhatsAppAPI.sendInteractiveList(
-      from,
-      MESSAGES[lang].ask_gender,
-      lang === 'hi' ? 'लिंग चुनें' : 'Select Gender',
-      [
-        {
-          title: lang === 'hi' ? '👶 लिंग' : '👶 Gender',
-          rows: [
-            {
-              id: 'gender_male',
-              title: lang === 'hi' ? '👦 पुरुष' : '👦 Male',
-              description: ''
-            },
-            {
-              id: 'gender_female',
-              title: lang === 'hi' ? '👧 महिला' : '👧 Female',
-              description: ''
-            },
-            {
-              id: 'gender_other',
-              title: lang === 'hi' ? '👶 अन्य' : '👶 Other',
-              description: ''
-            }
-          ]
-        }
-      ],
-      '👶 Child Details'
-    );
+    await WhatsAppAPI.sendTextMessage(from, messages.ask_gender);
   }
 
-  static async handleGenderSelection(from, genderId, session) {
+  static async handleGender(from, message, session) {
     const lang = session.language;
-    let gender;
+    const messages = MESSAGES[lang];
 
-    if (genderId.includes('male') && !genderId.includes('female')) {
+    let gender;
+    if (message === '1' || message.toLowerCase().includes('male') || message.toLowerCase().includes('पुरुष')) {
       gender = lang === 'hi' ? 'पुरुष' : 'Male';
-    } else if (genderId.includes('female')) {
+    } else if (message === '2' || message.toLowerCase().includes('female') || message.toLowerCase().includes('महिला')) {
       gender = lang === 'hi' ? 'महिला' : 'Female';
-    } else {
+    } else if (message === '3' || message.toLowerCase().includes('other') || message.toLowerCase().includes('अन्य')) {
       gender = lang === 'hi' ? 'अन्य' : 'Other';
+    } else {
+      await WhatsAppAPI.sendTextMessage(from, messages.invalid_input);
+      await WhatsAppAPI.sendTextMessage(from, messages.ask_gender);
+      return;
     }
 
     session.data.gender = gender;
@@ -934,108 +587,96 @@ class MessageHandler {
       state: 'COLLECT_FATHER_NAME',
       data: session.data
     });
-    await WhatsAppAPI.sendTextMessage(from, MESSAGES[lang].ask_father_name);
+    await WhatsAppAPI.sendTextMessage(from, messages.ask_father_name);
   }
 
   static async handleFatherName(from, message, session) {
+    const lang = session.language;
     session.data.fatherName = message;
     SessionManager.updateSession(from, { 
       state: 'COLLECT_MOTHER_NAME',
       data: session.data
     });
-    await WhatsAppAPI.sendTextMessage(from, MESSAGES[session.language].ask_mother_name);
+    await WhatsAppAPI.sendTextMessage(from, MESSAGES[lang].ask_mother_name);
   }
 
   static async handleMotherName(from, message, session) {
+    const lang = session.language;
     session.data.motherName = message;
     SessionManager.updateSession(from, { 
       state: 'COLLECT_PLACE_OF_BIRTH',
       data: session.data
     });
-
-    const lang = session.language;
-    await WhatsAppAPI.sendInteractiveList(
-      from,
-      MESSAGES[lang].ask_place_of_birth,
-      lang === 'hi' ? 'स्थान चुनें' : 'Select Place',
-      [
-        {
-          title: lang === 'hi' ? '🏥 जन्म स्थान' : '🏥 Birth Place',
-          rows: [
-            {
-              id: 'place_hospital',
-              title: lang === 'hi' ? '🏥 अस्पताल' : '🏥 Hospital',
-              description: lang === 'hi' ? 'अस्पताल में जन्म' : 'Born in hospital'
-            },
-            {
-              id: 'place_home',
-              title: lang === 'hi' ? '🏠 घर' : '🏠 Home',
-              description: lang === 'hi' ? 'घर पर जन्म' : 'Born at home'
-            },
-            {
-              id: 'place_other',
-              title: lang === 'hi' ? '📍 अन्य' : '📍 Other',
-              description: lang === 'hi' ? 'अन्य स्थान' : 'Other location'
-            }
-          ]
-        }
-      ],
-      '🏥 Birth Location'
-    );
+    await WhatsAppAPI.sendTextMessage(from, MESSAGES[lang].ask_place_of_birth);
   }
 
-  static async handlePlaceSelection(from, placeId, session) {
+  static async handlePlaceOfBirth(from, message, session) {
     const lang = session.language;
-    let place;
+    const messages = MESSAGES[lang];
 
-    if (placeId.includes('hospital')) {
+    let place;
+    if (message === '1' || message.toLowerCase().includes('hospital') || message.toLowerCase().includes('अस्पताल')) {
       place = lang === 'hi' ? 'अस्पताल' : 'Hospital';
       session.data.placeOfBirth = place;
       SessionManager.updateSession(from, { 
         state: 'COLLECT_HOSPITAL_NAME',
         data: session.data
       });
-      await WhatsAppAPI.sendTextMessage(from, MESSAGES[lang].ask_hospital_name);
-    } else {
-      place = placeId.includes('home') 
-        ? (lang === 'hi' ? 'घर' : 'Home')
-        : (lang === 'hi' ? 'अन्य' : 'Other');
-      
+      await WhatsAppAPI.sendTextMessage(from, messages.ask_hospital_name);
+    } else if (message === '2' || message.toLowerCase().includes('home') || message.toLowerCase().includes('घर')) {
+      place = lang === 'hi' ? 'घर' : 'Home';
       session.data.placeOfBirth = place;
       SessionManager.updateSession(from, { 
         state: 'COLLECT_ADDRESS',
         data: session.data
       });
-      await WhatsAppAPI.sendTextMessage(from, MESSAGES[lang].ask_address);
+      await WhatsAppAPI.sendTextMessage(from, messages.ask_address);
+    } else if (message === '3' || message.toLowerCase().includes('other') || message.toLowerCase().includes('अन्य')) {
+      place = lang === 'hi' ? 'अन्य' : 'Other';
+      session.data.placeOfBirth = place;
+      SessionManager.updateSession(from, { 
+        state: 'COLLECT_ADDRESS',
+        data: session.data
+      });
+      await WhatsAppAPI.sendTextMessage(from, messages.ask_address);
+    } else {
+      await WhatsAppAPI.sendTextMessage(from, messages.invalid_input);
+      await WhatsAppAPI.sendTextMessage(from, messages.ask_place_of_birth);
     }
   }
 
   static async handleHospitalName(from, message, session) {
+    const lang = session.language;
     session.data.hospitalName = message;
     session.data.placeOfBirth += ` - ${message}`;
     SessionManager.updateSession(from, { 
       state: 'COLLECT_ADDRESS',
       data: session.data
     });
-    await WhatsAppAPI.sendTextMessage(from, MESSAGES[session.language].ask_address);
+    await WhatsAppAPI.sendTextMessage(from, MESSAGES[lang].ask_address);
   }
 
   static async handleAddress(from, message, session) {
+    const lang = session.language;
     session.data.address = message;
     SessionManager.updateSession(from, { 
       state: 'COLLECT_MOBILE',
       data: session.data
     });
-    await WhatsAppAPI.sendTextMessage(from, MESSAGES[session.language].ask_mobile);
+    await WhatsAppAPI.sendTextMessage(from, MESSAGES[lang].ask_mobile);
   }
 
   static async handleMobile(from, message, session) {
+    const lang = session.language;
+    const messages = MESSAGES[lang];
+
+    // Basic mobile validation (10 digits)
     const mobileRegex = /^[6-9]\d{9}$/;
     const cleanMobile = message.replace(/\D/g, '');
     
     if (!mobileRegex.test(cleanMobile)) {
-      await WhatsAppAPI.sendTextMessage(from, MESSAGES[session.language].invalid_input);
-      await WhatsAppAPI.sendTextMessage(from, MESSAGES[session.language].ask_mobile);
+      await WhatsAppAPI.sendTextMessage(from, messages.invalid_input);
+      await WhatsAppAPI.sendTextMessage(from, messages.ask_mobile);
       return;
     }
 
@@ -1045,8 +686,8 @@ class MessageHandler {
       data: session.data
     });
 
-    const lang = session.language;
-    const confirmMsg = MESSAGES[lang].confirm_details
+    // Show confirmation
+    const confirmMsg = messages.confirm_details
       .replace('{childName}', session.data.childName)
       .replace('{dob}', session.data.dob)
       .replace('{gender}', session.data.gender)
@@ -1056,72 +697,122 @@ class MessageHandler {
       .replace('{address}', session.data.address)
       .replace('{mobile}', session.data.mobile);
 
-    await WhatsAppAPI.sendInteractiveButtons(
-      from,
-      confirmMsg,
-      [
-        { id: 'confirm_yes', title: lang === 'hi' ? '✅ हां, सबमिट करें' : '✅ Yes, Submit' },
-        { id: 'confirm_no', title: lang === 'hi' ? '❌ नहीं, रद्द करें' : '❌ No, Cancel' }
-      ],
-      '✅ Final Verification',
-      'Review carefully before submitting'
-    );
-  }
-
-  static async submitApplication(from, session) {
-    const applicationId = `BC${Date.now()}`;
-    const date = new Date().toLocaleDateString('en-IN');
-    
-    applications.set(applicationId, {
-      id: applicationId,
-      userId: from,
-      data: session.data,
-      status: 'submitted',
-      submittedAt: new Date().toISOString()
-    });
-
-    const lang = session.language;
-    const confirmMsg = MESSAGES[lang].application_submitted
-      .replace(/{applicationId}/g, applicationId)
-      .replace('{date}', date)
-      .replace('{mobile}', session.data.mobile);
-    
     await WhatsAppAPI.sendTextMessage(from, confirmMsg);
-
-    SessionManager.updateSession(from, { 
-      state: 'MAIN_MENU',
-      data: {}
-    });
-
-    console.log('Application submitted:', applications.get(applicationId));
   }
 
-  static async cancelApplication(from, session) {
-    SessionManager.resetSession(from);
+  static async handleConfirmation(from, message, session) {
     const lang = session.language;
-    await WhatsAppAPI.sendTextMessage(
-      from,
-      lang === 'hi'
-        ? '🔄 आवेदन रद्द कर दिया गया। फिर से शुरू करने के लिए MENU टाइप करें।'
-        : '🔄 Application cancelled. Type MENU to start over.'
-    );
-  }
+    const messages = MESSAGES[lang];
 
-  static async handleMainMenuSelection(from, message, session) {
-    if (message === '1' || message.toLowerCase().includes('apply')) {
-      await this.startApplication(from, session);
-    } else if (message === '2' || message.toLowerCase().includes('status')) {
-      await this.checkStatus(from, session);
+    if (message === '1' || message.toLowerCase().includes('yes') || message.toLowerCase().includes('हां')) {
+      // Generate application ID
+      const applicationId = `BC${Date.now()}`;
+      
+      // Save application
+      applications.set(applicationId, {
+        id: applicationId,
+        userId: from,
+        data: session.data,
+        status: 'submitted',
+        submittedAt: new Date().toISOString()
+      });
+
+      // Send confirmation
+      const confirmMsg = messages.application_submitted
+        .replace('{applicationId}', applicationId);
+      
+      await WhatsAppAPI.sendTextMessage(from, confirmMsg);
+
+      // Reset to main menu
+      SessionManager.updateSession(from, { 
+        state: 'MAIN_MENU',
+        data: {}
+      });
+
+      console.log('Application submitted:', applications.get(applicationId));
+
+    } else if (message === '2' || message.toLowerCase().includes('no') || message.toLowerCase().includes('नहीं')) {
+      SessionManager.resetSession(from);
+      await WhatsAppAPI.sendTextMessage(
+        from,
+        lang === 'hi'
+          ? '🔄 आवेदन रद्द कर दिया गया। फिर से शुरू करने के लिए MENU टाइप करें।'
+          : '🔄 Application cancelled. Type MENU to start over.'
+      );
     } else {
-      await WhatsAppAPI.sendTextMessage(from, MESSAGES[session.language].help);
+      await WhatsAppAPI.sendTextMessage(from, messages.invalid_input);
     }
   }
 }
 
 // =============================================================================
+// FORM ENDPOINTS
+// =============================================================================
+
+// Serve the birth certificate form
+app.get('/form/birth-certificate', (req, res) => {
+  res.sendFile(__dirname + '/birth-certificate-form.html');
+});
+
+// API endpoint to handle form submissions
+app.post('/api/submit-application', express.json(), async (req, res) => {
+  try {
+    const formData = req.body;
+    const phoneNumber = formData.phoneNumber;
+    
+    // Generate application ID
+    const applicationId = `BC${Date.now()}`;
+    
+    // Save application
+    applications.set(applicationId, {
+      id: applicationId,
+      userId: phoneNumber,
+      data: formData,
+      status: 'submitted',
+      submittedAt: new Date().toISOString()
+    });
+
+    console.log('✅ Application submitted via form:', applicationId);
+
+    // Send confirmation message to WhatsApp
+    if (phoneNumber && phoneNumber !== 'unknown') {
+      const confirmationMsg = `🎉 *Application Submitted Successfully!*
+
+Your application ID: *${applicationId}*
+
+✅ Birth certificate application received
+📧 Confirmation details:
+   Child: ${formData.childName}
+   DOB: ${formData.dob}
+   District: ${formData.district}
+
+⏱️ Processing time: 7-10 working days
+
+Type *MENU* to return to main menu.`;
+
+      await WhatsAppAPI.sendTextMessage(phoneNumber, confirmationMsg);
+    }
+
+    res.json({
+      success: true,
+      applicationId: applicationId,
+      message: 'Application submitted successfully'
+    });
+
+  } catch (error) {
+    console.error('Form submission error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to submit application. Please try again.'
+    });
+  }
+});
+
+// =============================================================================
 // WEBHOOK ENDPOINTS
 // =============================================================================
 
+// Webhook verification (required by Meta)
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -1136,11 +827,27 @@ app.get('/webhook', (req, res) => {
   }
 });
 
+// Webhook for receiving messages
 app.post('/webhook', async (req, res) => {
   try {
+    // Quick response to Meta
     res.sendStatus(200);
 
     const body = req.body;
+
+    // Verify webhook signature (security) - TEMPORARILY DISABLED FOR TESTING
+    // const signature = req.headers['x-hub-signature-256'];
+    // if (signature) {
+    //   const expectedSignature = crypto
+    //     .createHmac('sha256', CONFIG.WHATSAPP_TOKEN)
+    //     .update(JSON.stringify(body))
+    //     .digest('hex');
+    //   
+    //   if (`sha256=${expectedSignature}` !== signature) {
+    //     console.error('Invalid webhook signature');
+    //     return;
+    //   }
+    // }
 
     if (body.object === 'whatsapp_business_account') {
       for (const entry of body.entry) {
@@ -1148,18 +855,27 @@ app.post('/webhook', async (req, res) => {
           if (change.field === 'messages') {
             const message = change.value.messages?.[0];
             
-            if (!message) continue;
-
-            const from = message.from;
-
-            if (message.type === 'text') {
+            if (message && message.type === 'text') {
+              const from = message.from;
               const messageText = message.text.body;
-              console.log(`📩 Text from ${from}: ${messageText}`);
-              await MessageHandler.handle(from, messageText, 'text');
-            } else if (message.type === 'interactive') {
-              const interactive = message.interactive;
-              console.log(`📩 Interactive from ${from}:`, interactive);
-              await MessageHandler.handle(from, interactive, 'interactive');
+
+              console.log(`📩 Received message from ${from}: ${messageText}`);
+
+              // Process message
+              await MessageHandler.handle(from, messageText);
+            } else if (message && message.type === 'interactive') {
+              const from = message.from;
+              const buttonReply = message.interactive.button_reply?.id || 
+                                 message.interactive.list_reply?.id;
+
+              console.log(`📩 Received button click from ${from}: ${buttonReply}`);
+
+              // Handle button clicks
+              if (buttonReply === 'lang_en') {
+                await MessageHandler.handleLanguageSelection(from, 'english', SessionManager.getSession(from));
+              } else if (buttonReply === 'lang_hi') {
+                await MessageHandler.handleLanguageSelection(from, 'hindi', SessionManager.getSession(from));
+              }
             }
           }
         }
@@ -1170,16 +886,17 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy',
-    version: '2.0 - Professional Edition',
     timestamp: new Date().toISOString(),
     sessions: userSessions.size,
     applications: applications.size
   });
 });
 
+// Get all applications (admin endpoint)
 app.get('/applications', (req, res) => {
   res.json({
     total: applications.size,
@@ -1192,17 +909,17 @@ app.get('/applications', (req, res) => {
 // =============================================================================
 
 app.listen(CONFIG.PORT, () => {
-  console.log('🚀 Birth Certificate Bot V2 is running!');
-  console.log('🎨 Professional Edition with Interactive UI');
+  console.log('🚀 Birth Certificate Bot is running!');
   console.log(`📡 Server listening on port ${CONFIG.PORT}`);
   console.log(`🔗 Webhook URL: https://your-domain.com/webhook`);
   console.log(`✅ Ready to receive messages!`);
   
   if (!CONFIG.WHATSAPP_TOKEN || !CONFIG.WHATSAPP_PHONE_ID) {
-    console.warn('⚠️ WARNING: WhatsApp credentials not set');
+    console.warn('⚠️ WARNING: WhatsApp credentials not set in environment variables');
   }
 });
 
+// Handle graceful shutdown
 process.on('SIGTERM', () => {
   console.log('👋 Shutting down gracefully...');
   process.exit(0);
